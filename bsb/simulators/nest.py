@@ -42,6 +42,7 @@ class MapsScaffoldIdentifiers:
 
     def get_nest_ids(self, ids):
         return [self.scaffold_to_nest_map[id] for id in ids]
+        print("Hello world")
 
 
 class NestCell(SimulationCell, MapsScaffoldIdentifiers):
