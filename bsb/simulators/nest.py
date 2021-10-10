@@ -804,24 +804,73 @@ class NestAdapter(SimulatorAdapter):
         for device_model in self.devices.values():
             device_model.initialise_targets()
             device_model.protocol.before_create()
-            device = self.nest.Create(device_model.device)
-            report("Creating device:  " + device_model.device, level=3)
-            # Execute SetStatus and catch DictError
-            self.execute_command(
-                self.nest.SetStatus,
-                device,
-                device_model.parameters,
-                exceptions={
-                    "DictError": {
-                        "from": None,
-                        "exception": catch_dict_error(
-                            "Could not create {} device '{}': ".format(
-                                device_model.device, device_model.name
+            if device_model.device == "spike_generator":
+                if device_model.parameters["different_per_target"] is True:
+                    burst_dur = device_model.parameters["burst_dur"]
+                    start_first = device_model.parameters["start_first"]
+                    n_targets = device_model.parameters["n_targets"]
+                    n_spikes = int(device_model.parameters["rate"] * burst_dur / 1000)
+                    between_start = device_model.parameters["between_start"]
+                    n_trials = device_model.parameters["n_trials"]
+
+                    CS_matrix_start = np.sort(
+                        np.round(
+                            (
+                                np.random.uniform(
+                                    start_first,
+                                    burst_dur + start_first,
+                                    [n_targets, n_spikes],
+                                )
                             )
-                        ),
-                    }
-                },
-            )
+                        )
+                    )
+                    CS_matrix = np.concatenate(
+                        [CS_matrix_start + between_start * t for t in range(n_trials)],
+                        axis=1,
+                    )
+                    device = self.nest.Create(device_model.device, n_targets)
+                    report("Creating device:  " + device_model.device, level=3)
+
+                    for sg in range(len(device)):
+                        self.nest.SetStatus(
+                            device[sg : sg + 1], params={"spike_times": CS_matrix[sg]}
+                        )
+                else:
+                    burst_dur = device_model.parameters["burst_dur"]
+                    start_first = device_model.parameters["start_first"]
+                    isi = 1000 / device_model.parameters["rate"]
+                    between_start = device_model.parameters["between_start"]
+                    n_trials = device_model.parameters["n_trials"]
+                    US_matrix = np.concatenate(
+                        [
+                            np.arange(start_first, start_first + burst_dur + isi, isi)
+                            + between_start * t
+                            for t in range(n_trials)
+                        ]
+                    )
+                    device = self.nest.Create(
+                        device_model.device, params={"spike_times": US_matrix}
+                    )
+                    report("Creating device:  " + device_model.device, level=3)
+            else:
+                device = self.nest.Create(device_model.device)
+                report("Creating device:  " + device_model.device, level=3)
+                # Execute SetStatus and catch DictError
+                self.execute_command(
+                    self.nest.SetStatus,
+                    device,
+                    device_model.parameters,
+                    exceptions={
+                        "DictError": {
+                            "from": None,
+                            "exception": catch_dict_error(
+                                "Could not create {} device '{}': ".format(
+                                    device_model.device, device_model.name
+                                )
+                            ),
+                        }
+                    },
+                )
             device_model.protocol.after_create(device)
             # Execute targetting mechanism to fetch target NEST ID's
             device_targets = device_model.get_nest_targets()
