@@ -808,7 +808,7 @@ class NestAdapter(SimulatorAdapter):
                 if device_model.parameters["different_per_target"] is True:
                     burst_dur = device_model.parameters["burst_dur"]
                     start_first = device_model.parameters["start_first"]
-                    n_targets = device_model.parameters["n_targets"]
+                    n_targets = len(device_model.get_nest_targets())
                     n_spikes = int(device_model.parameters["rate"] * burst_dur / 1000)
                     between_start = device_model.parameters["between_start"]
                     n_trials = device_model.parameters["n_trials"]
